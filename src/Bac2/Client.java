@@ -7,7 +7,14 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.NotBoundException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import javax.swing.JOptionPane;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  *
  * @author nguyen
@@ -151,7 +158,7 @@ public static final int port=2740;
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
         // TODO add your handling code here:
-        try{
+        try {
             Registry registry = LocateRegistry.getRegistry("localhost", port);
 
             // Tìm đối tượng Calculator trong registry
@@ -165,22 +172,49 @@ public static final int port=2740;
             // Gọi phương thức từ xa và hiển thị kết quả
             String result = calculator.tinh(a, b, c);
             JOptionPane.showMessageDialog(this, result, "Kết quả", JOptionPane.INFORMATION_MESSAGE);
-            
+
+            // Lưu kết quả vào cơ sở dữ liệu
+            saveResultToDatabase(a, b, c, result);
+
         } catch (RemoteException | NotBoundException e) {
             JOptionPane.showMessageDialog(this, "Đã xảy ra lỗi " + e, "Lỗi", JOptionPane.ERROR_MESSAGE);
-        
         }
     }//GEN-LAST:event_jButton1ActionPerformed
     
+    private void saveResultToDatabase(double a, double b, double c, String result) {
+    String sql = "INSERT INTO KetQua (a, b, c, dapan, ngaytao) VALUES (?, ?, ?, ?, ?)";
+
+    // Lấy thời điểm hiện tại
+    LocalDateTime now = LocalDateTime.now();
+    // Định dạng thời điểm theo định dạng SQL
+    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    String formattedNow = now.format(formatter);
+
+    try (Connection conn = ConnectionDB.getConnection();
+         PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+        pstmt.setDouble(1, a);
+        pstmt.setDouble(2, b);
+        pstmt.setDouble(3, c);
+        pstmt.setString(4, result);
+        pstmt.setString(5, formattedNow); // Gán thời điểm hiện tại vào trường `ngaytao`
+
+        int rowsAffected = pstmt.executeUpdate();
+        if (rowsAffected > 0) {
+            JOptionPane.showMessageDialog(this, "Kết quả đã được lưu vào cơ sở dữ liệu!", "Thông báo", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            JOptionPane.showMessageDialog(this, "Không lưu được kết quả vào cơ sở dữ liệu!", "Thông báo", JOptionPane.WARNING_MESSAGE);
+        }
+    } catch (SQLException e) {
+        JOptionPane.showMessageDialog(this, "Lỗi kết nối cơ sở dữ liệu: " + e.getMessage(), "Lỗi", JOptionPane.ERROR_MESSAGE);
+        e.printStackTrace();
+    }
+}
     /**
      * @param args the command line arguments
      */
-     public static void main(String args[]) {
-        java.awt.EventQueue.invokeLater(new Runnable() {
-            public void run() {
-                new Client().setVisible(true);
-            }
-        });
+    public static void main(String args[]) {
+        java.awt.EventQueue.invokeLater(() -> new Client().setVisible(true));
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
